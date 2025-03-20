@@ -1,0 +1,13 @@
+library Roll
+
+class CollectDice : Visitor
+  PROPERTIES
+    dice = Dice[]
+
+  METHODS
+    method on_visit_node( cmd:Dice )
+      dice.add( cmd )
+
+    method roll
+      (forEach in dice).roll
+endClass

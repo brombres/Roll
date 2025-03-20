@@ -1,0 +1,104 @@
+================================================================================
+# Roll.froley
+================================================================================
+
+--------------------------------------------------------------------------------
+tokens
+--------------------------------------------------------------------------------
+EOL(end of line)
+DICE       dice       [content]
+NUMBER     number     [content]
+
+--------------------------------------------------------------------------------
+tokens Symbols
+--------------------------------------------------------------------------------
+SYMBOL_CLOSE_PAREN )  [structural]
+SYMBOL_COMMA       ,  [structural]
+SYMBOL_EQUALS      =
+SYMBOL_MINUS       -
+SYMBOL_OPEN_PAREN  (
+SYMBOL_PLUS        +
+SYMBOL_SLASH       /
+SYMBOL_STAR        *
+
+--------------------------------------------------------------------------------
+scanner
+--------------------------------------------------------------------------------
+- main
+  consume [ \r\t]*               # whitespace
+  if consume("#" [^\n]*) restart # single-line comment
+
+  if (not hasAnother) halt
+  markPosition
+
+  if (consume('\n')) produce EOL
+
+  match
+    produceAny Symbols
+  endMatch
+
+  scan_dice
+  scan_number
+
+  syntaxError
+
+- scan_dice
+  if (not (scan([dD]) or scan([1-9][dD]))) return
+  if (not nextIs([1-9])) syntaxError "1 or greater expected."
+  scan( [1-9][0-9]* )
+  produce DICE
+
+- scan_number
+  if (not hasAnother) return
+  if (scan [0-9]+) produce NUMBER
+
+- scan_integer
+  scan [0-9]*  # Fills 'buffer' with remaining digits
+
+--------------------------------------------------------------------------------
+parser
+--------------------------------------------------------------------------------
+- ast
+  statements
+  produce AST(statements)
+
+- statements
+  consume_eols
+
+  beginList
+
+  while (hasAnother and not nextHasAttribute(structural))
+    statement
+    consume_eols
+  endWhile
+
+  produceList Statements
+
+- statement
+  expression
+  while (consume(','))
+    expression
+  endWhile
+
+- consume_eols
+  while (consume(EOL)) noAction
+
+- expression
+  add_subtract
+
+- add_subtract [binary]
+  on "+" -> Add
+  on "-" -> Subtract
+
+- multiply_divide [binary]
+  on "*" -> Multiply
+  on "/" -> Divide
+
+- negate [preUnary]
+  on "-" -> Negate
+
+- term
+  on '(' expression ')': return
+  on DICE   -> Dice(name=content)
+  on NUMBER -> Number(value=content:Int)
+  syntaxError

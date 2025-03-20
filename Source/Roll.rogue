@@ -1,0 +1,77 @@
+library Roll
+
+$include CollectDice
+$include PrintResults
+$include Scanner
+$include Parser  [optional]
+
+uses Roll
+uses Console/CommandLineParser
+
+try
+  Roll( System.command_line_arguments )
+catch (error:CompileError)
+  Console.error.println error
+  System.exit 1
+catch (error:Error)
+  Console.error.println error
+  Console.error.println error.stack_trace
+  System.exit 1
+endTry
+
+class Roll
+  PROPERTIES
+    command : Variant
+
+  METHODS
+    method init( args:String[] )
+      command = parse_args( args )
+
+      # trace command
+      # has //options and possibly //args
+
+      if (command//options//help or command//args.count == 0)
+        print_usage
+        System.exit 0
+      endIf
+
+      parse_files
+
+    method parse_files
+      if (command//args.count and File(command//args[0]->String).exists)
+        forEach (arg in command//args)
+          local filepath = arg->String
+          local parser = Parser( File(filepath) )
+          local ast = parser.parse
+          local set = CollectDice().[ visit(ast) ]
+          set.roll
+          PrintResults().visit( ast )
+        endForEach
+      else
+        local cmd_line = command//args.map_list<<String>>.join( ' ' )
+        local parser = Parser( "Command Line", cmd_line )
+        local ast = parser.parse
+        local set = CollectDice().[ visit(ast) ]
+        set.roll
+        PrintResults().visit( ast )
+      endIf
+
+    method parse_args( args:String[] )->Variant
+      # This method is unrelated to the Froley Parser
+      local command = CommandLineParser().
+      [
+        option( "--help",     &aliases=["-h","-?"] )
+      ].parse( args )
+      return command
+
+    method print_usage
+      println @|USAGE
+               |  roll [OPTIONS] <expression-or-filepath>
+               |
+               |OPTIONS
+               |  --help, -h, -?
+               |    Show this help text.
+               |
+               |EXAMPLE
+               |  roll d6 + 3, 2d4
+endClass
